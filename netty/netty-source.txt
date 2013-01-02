@@ -64,6 +64,9 @@ readBytes(ChannelBuffer dst)						yes	yes
 
 ===============problems============= 
 client channel close后，server channel 要不要手动close？？？
+
+2013-1-2 21:21:25：
+server在read得到-1（表示client的channel close了？！）、write抛出IOException后，都会close(channel, succeededFuture(channel));
 =============================================================
 
 NioWorkerPool父类AbstractNioWorkerPool构造函数中，workers = new AbstractNioWorker[workerCount]，init（）中workers[i] = newWorker(workerExecutor)，（new NioWorker(executor, determiner)），NioWorker的父类AbstractNioWorker的父类AbstractNioSelector构造函数中，openSelector(determiner)，openSelector(ThreadNameDeterminer determiner)中selector = Selector.open();DeadLockProofWorker.start(executor, newThreadRenamingRunnable(id, determiner));，AbstractNioWorker将自己包装一下：new ThreadRenamingRunnable(this, "New I/O worker #" + id, determiner);，AbstractNioSelector中的run开始运行。
