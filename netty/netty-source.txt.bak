@@ -62,7 +62,7 @@ readBytes(ChannelBuffer dst)						yes	yes
 
 
 
-===============problems============= 
+===============problems=============
 client channel close后，server channel 要不要手动close？？？
 =============================================================
 
