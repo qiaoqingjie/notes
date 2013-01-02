@@ -274,12 +274,14 @@ NioServerSocketPipelineSink.handleAcceptedSocket(ChannelEvent e):
             channel.worker.writeFromUserCode(channel);
         }
 	
+
+
 =========================================================================
-SocketSendBuffer.poolHead：write过程可能创建多个new Preallocation(DEFAULT_PREALLOCATION_SIZE)，PooledSendBuffer在release的时候，如果所包含的Preallocation parent中的int refCnt为0，则parent.buffer.clear();，并且poolHead = new PreallocationRef(parent, poolHead);，也就是poolHead指向parent，并且其next为之前的poolHead。
+SocketSendBuffer.poolHead：write过程可能创建多个new Preallocation(DEFAULT_PREALLOCATION_SIZE)，PooledSendBuffer在release的时候，如果所包含的Preallocation parent中的int refCnt为0，则parent.buffer.clear();，如果parent != current 则poolHead = new PreallocationRef(parent, poolHead);，也就是poolHead指向parent，并且其next为之前的poolHead。
 
 
 ===========================================================================================================================
-write将message中的ChannelBuffer复制到DirectBuffer，再将其写入WritableByteChannel（这个写入需要ByteBuffer参数，这里用DirectBuffer，没用ChannelBuffer的toByteBuffer方法将其复制到普通的ByteBuffer。）。
+write将message中的ChannelBuffer复制到DirectBuffer，再将其写入WritableByteChannel（这个写入需要ByteBuffer参数，这里用DirectBuffer，没用ChannelBuffer的toByteBuffer方法将其复制到普通的ByteBuffer。）。每个AbstractNioWorker都对DirectBuffer有重用机制。
 
 Non-direct与direct ByteBuffer区别：http://blog.csdn.net/lovehota/article/details/7407574
 采用Non-directByteBuffer的流程是这样的：
@@ -288,3 +290,40 @@ Non-direct与direct ByteBuffer区别：http://blog.csdn.net/lovehota/article/det
 而采用DirectByteBuffer的流程是这样的：
 网络 --> 应用 DirectByteBuffer --> 网络
 ==================================================================================================================
+
+[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[
+注意：64 * 1024 == 65536:
+
+DefaultNioSocketChannelConfig:
+	private volatile int writeBufferHighWaterMark = 64 * 1024;
+
+AbstractNioWorker：
+	protected final SocketSendBufferPool sendBufferPool = new SocketSendBufferPool();
+SocketSendBufferPool:
+	private static final int DEFAULT_PREALLOCATION_SIZE = 65536;
+	private Preallocation current = new Preallocation(DEFAULT_PREALLOCATION_SIZE);
+Preallocation:
+	final ByteBuffer buffer;
+        int refCnt;
+        Preallocation(int capacity) {
+            buffer = ByteBuffer.allocateDirect(capacity);
+        }
+
+AbstractNioChannel:
+	MessageEvent currentWriteEvent;
+	SendBuffer currentWriteBuffer;（SendBuffer与SocketSendBufferPool的Preallocation共享底层的ByteBuffer）
+
+
+]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]
+
+[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[
+注意：
+AbstractChannel:
+	public boolean isReadable() {
+		return (getInterestOps() & OP_READ) != 0;
+	}
+
+	public boolean isWritable() {
+		return (getInterestOps() & OP_WRITE) == 0;
+	}
+]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]
