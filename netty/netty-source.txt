@@ -271,4 +271,5 @@ NioServerSocketPipelineSink.handleAcceptedSocket(ChannelEvent e):
             channel.worker.writeFromUserCode(channel);
         }
 	
-	
+=========================================================================
+SocketSendBuffer.poolHead：write过程可能创建多个new Preallocation(DEFAULT_PREALLOCATION_SIZE)，PooledSendBuffer在release的时候，如果所包含的Preallocation parent中的int refCnt为0，则parent.buffer.clear();，并且poolHead = new PreallocationRef(parent, poolHead);，也就是poolHead指向parent，并且其next为之前的poolHead。
