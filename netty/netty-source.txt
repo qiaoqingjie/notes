@@ -1,0 +1,274 @@
+看netty source的目的：完全搞清楚netty的运行过程细节，更好的使用netty、快速排错。
+
+1、Bootstrap。
+DefaultChannelPipeline 包含DefaultChannelHandlerContext的链表（head、tail）；
+
+DefaultChannelHandlerContext包含prev、next、name、ChannelHandler（ChannelUpstreamHandler或ChannelDownstreamHandler）。
+
+2、ServerBootstrap。
+
+pipeline和channel是一对一的。pipeline和sink也是一对一。
+（DefaultChannelPipeline中有一个Channel、一个ChannelSink）
+
+
+
+ channel.getPipeline().sendUpstream(
+                new DefaultExceptionEvent(channel, cause))
+从DefaultChannelPipeline 的head开始，找到第一个可以canHandleUpstream的DefaultChannelHandlerContext，然后((ChannelUpstreamHandler) ctx.getHandler()).handleUpstream(ctx, e);
+
+DefaultChannelPipeline的sendDownstream(ChannelEvent e)从tail开始，找到第一个canHandleDownstream（）的DefaultChannelHandlerContext，然后((ChannelDownstreamHandler) ctx.getHandler()).handleDownstream(ctx, e);，如果找不到（null），getSink().eventSunk(this, e);
+
+
+ DefaultChannelPipeline.attach(Channel channel, ChannelSink sink) 只能一次 
+
+
+
+????????????????????????????????????????????????????????????????????
+ if (CONSTRAINT_LEVEL != 0) {
+                selectorGuard.writeLock().lock();
+                    // This empty synchronization block prevents the selector
+                    // from acquiring its lock.
+                selectorGuard.writeLock().unlock();
+            }
+??????????????????????????????????????????????????????????????????????
+
+
+ DefaultChannelPipeline.sendDownstream(ChannelEvent e)中，if (tail == null)则getSink().eventSunk(this, e);
+
+
+读取数据，用的buffer是DirectByteBuffer，重用，size是1024的倍数，size不满足等情况，先销毁再创建新的，销毁用反射，因为DirectByteBuffer和其中的cleaner是不可见的。（class.forName（）、method.setAccessible(true)）；读完后，复制到BigEndianHeapChannelBuffer中，最后fireMessageReceived(channel, buffer)。
+
+
+================ChannelBuffer======================================================================================		
+							改变自己的writerIndex	改变参数的writerIndex
+writeBytes(ChannelBuffer src, int srcIndex, int length)			yes	no
+writeBytes(ChannelBuffer src, int length)				yes	yes
+writeBytes(ChannelBuffer src)						yes	yes
+
+setBytes(int index, ChannelBuffer src, int srcIndex, int length)	no	no			
+setBytes(int index, ChannelBuffer src, int length)			no	yes
+setBytes(int index, ChannelBuffer src)					no	yes
+
+							改变自己的readerIndex	改变参数的readerIndex
+getBytes(int index, ChannelBuffer dst, int dstIndex, int length)	no	no
+getBytes(int index, ChannelBuffer dst, int length)			no	yes
+getBytes(int index, ChannelBuffer dst)					no	yes
+
+readBytes(ChannelBuffer dst, int dstIndex, int length)			yes	no
+readBytes(ChannelBuffer dst, int length)				yes	yes
+readBytes(ChannelBuffer dst)						yes	yes
+================ChannelBuffer=========================================================================================
+
+
+
+
+===============problems=============
+client channel close后，server channel 要不要手动close？？？
+=============================================================
+
+NioWorkerPool父类AbstractNioWorkerPool构造函数中，workers = new AbstractNioWorker[workerCount]，init（）中workers[i] = newWorker(workerExecutor)，（new NioWorker(executor, determiner)），NioWorker的父类AbstractNioWorker的父类AbstractNioSelector构造函数中，openSelector(determiner)，openSelector(ThreadNameDeterminer determiner)中selector = Selector.open();DeadLockProofWorker.start(executor, newThreadRenamingRunnable(id, determiner));，AbstractNioWorker将自己包装一下：new ThreadRenamingRunnable(this, "New I/O worker #" + id, determiner);，AbstractNioSelector中的run开始运行。
+
+
+NioServerBossPool(Executor bossExecutor, int bossCount, ThreadNameDeterminer determiner)
+	AbstractNioBossPool(Executor bossExecutor, int bossCount)：bosses = new Boss[bossCount];
+		init()：bosses[i] = newBoss(bossExecutor);
+			newBoss(Executor executor)：new NioServerBoss(executor, determiner);
+NioServerBoss(Executor bossExecutor, ThreadNameDeterminer determiner)
+	AbstractNioSelector(Executor executor, ThreadNameDeterminer determiner)（同上）
+
+
+	0		1		2
+channelOpen =》 channelBound =》 channelConnected
+						-1
+channelClosed 《= channelUnbound 《=  channelDisconnected
+
+=========================================
+channelOpen：	futureQueue.offer(evt.getChannel().bind(localAddress));
+	bind(SocketAddress localAddress)
+		Channels.bind(this, localAddress);
+			 channel.getPipeline().sendDownstream（。。。。）
+				DefaultChannelHandlerContext是null，所以getSink().eventSunk(this, e)
+					handleServerSocket(e);
+						((NioServerBoss) channel.boss).bind(channel, future, (SocketAddress) value);
+							registerTask(new RegisterTask(channel, future, localAddress));
+								taskQueue.add(task);
+								if (wakenUp.compareAndSet(false, true)) {
+									selector.wakeup();
+								}
+
+
+task run():
+	channel.socket.socket().bind(localAddress, channel.getConfig().getBacklog());
+	future.setSuccess();
+	fireChannelBound(channel, channel.getLocalAddress());
+	channel.socket.register(selector, SelectionKey.OP_ACCEPT, channel);
+	
+						
+NioServerBoss的run（）：（AbstractNioSelector，NioClientBoss和NioServerBoss的run都直继承它的run；AbstractNioWorker的run重写后super.run()，NioDatagramWorker和NioWorker的run都再次重写后super.run()）
+	for(;;){
+		selector.select(500)
+		if (wakenUp.get()) {
+		    selector.wakeup();
+		} 
+		processTaskQueue();
+		if (shutdown) {
+		。。。
+		} else {
+		    process(selector);
+		}	
+	}
+
+ps：selector检测到可以accept的那啥后：
+NioServerBoss.process(selector)：
+	for (Iterator<SelectionKey> i = selectedKeys.iterator(); i.hasNext();) {
+            SelectionKey k = i.next();
+            i.remove();
+            NioServerSocketChannel channel = (NioServerSocketChannel) k.attachment();
+
+            try {
+                for (;;) {
+                    SocketChannel acceptedSocket = channel.socket.accept();
+                    if (acceptedSocket == null) {
+                        break;
+                    }
+                    registerAcceptedChannel(channel, acceptedSocket, thread);
+                }
+            }catch。。。。。（）{
+	    
+	    }
+
+NioServerBoss.registerAcceptedChannel(NioServerSocketChannel parent, SocketChannel acceptedSocket, Thread currentThread)：
+	try {
+            ChannelSink sink = parent.getPipeline().getSink();
+            ChannelPipeline pipeline =
+                    parent.getConfig().getPipelineFactory().getPipeline();
+            NioWorker worker = parent.workerPool.nextWorker();
+            worker.register(new NioAcceptedSocketChannel(
+                    parent.getFactory(), pipeline, parent, sink
+                    , acceptedSocket,
+                    worker, currentThread), null);
+        } catch。。。
+
+AbstractNioSelector.register(Channel channel, ChannelFuture future):
+	1: Runnable task = createRegisterTask(channel, future);
+        2: registerTask(task);
+1:
+NioWorker.createRegisterTask(Channel channel, ChannelFuture future):
+	boolean server = !(channel instanceof NioClientSocketChannel);
+        return new RegisterTask((NioSocketChannel) channel, future, server);
+
+NioWorker.RegisterTask.run()：（register selector）
+	if (localAddress == null || remoteAddress == null) {
+		close(channel, succeededFuture(channel));
+		return;
+	}
+	if (server) {
+	    channel.channel.configureBlocking(false);
+	}
+	channel.channel.register(selector, channel.getRawInterestOps(), channel);
+	......
+	fireChannelConnected(channel, remoteAddress);
+
+插入：
+	NioWorker.run():
+		super.run();
+		recvBufferPool.releaseExternalResources();
+	AbstractNioWorker.run():（就是上面的super.run()）
+		super.run();
+		sendBufferPool.releaseExternalResources();
+	AbstractNioSelector.run():（就是上面的super.run()）
+		（上文中，NioServerBoss的run（）已经描述过。这里面，调用上面的NioWorker.RegisterTask.run()，和下面的process）
+
+	AbstractNioWorker.process(Selector selector):
+==============process很大=========
+遍历selector.selectedKeys()中的SelectionKey：
+
+操作类型：int readyOps = k.readyOps();
+
+读：if ((readyOps & SelectionKey.OP_READ) != 0 || readyOps == 0) ：
+NioWorker.read(SelectionKey k):
+	读取数据，用的buffer是DirectByteBuffer，重用，size是1024的倍数，size不满足等情况，先销毁再创建新的，销毁用反射，因为DirectByteBuffer和其中的cleaner是不可见的。（class.forName（）、method.setAccessible(true)）；读完后，复制到BigEndianHeapChannelBuffer中，最后fireMessageReceived(channel, buffer)。
+
+	final SocketChannel ch = (SocketChannel) k.channel();这是NioAcceptedSocketChannel中的channel，由SocketChannel			acceptedSocket = channel.socket.accept();而来。
+        final NioSocketChannel channel = (NioSocketChannel) k.attachment();这是NioAcceptedSocketChannel自己。
+
+	读操作结束（ret = ch.read(bb)后ret<0（注：ret == 0是没读到数据，不会关闭；ret == -1是读结束））或出现异常，就关闭NioAcceptedSocketChannel：
+		k.cancel(); // Some JDK implementations run into an infinite loop without this.
+		close(channel, succeededFuture(channel));
+		return false;
+
+写：if ((readyOps & SelectionKey.OP_WRITE) != 0)：
+AbstractNioWorker.writeFromSelectorLoop(final SelectionKey k):
+
+
+=============================================
+	
+2:
+AbstractNioSelector.registerTask(Runnable task):
+	taskQueue.add(task);
+
+        Selector selector = this.selector;
+
+        if (selector != null) {
+            if (wakenUp.compareAndSet(false, true)) {
+                selector.wakeup();
+            }
+        } else {
+            if (taskQueue.remove(task)) {
+                // the selector was null this means the Worker has already been shutdown.
+                throw new RejectedExecutionException("Worker has already been shutdown");
+            }
+        }
+
+======================
+client发请求、server返回结果的write过程：
+
+AbstractChannel.write(Object message)：
+	return Channels.write(this, message);
+Channels.write(Channel channel, Object message):
+	return write(channel, message, null);
+Channels.write(Channel channel, Object message, SocketAddress remoteAddress):
+	ChannelFuture future = future(channel);
+        channel.getPipeline().sendDownstream(new DownstreamMessageEvent(channel, future, message, remoteAddress));
+        return future;
+DefaultChannelPipleine.sendDownstream(ChannelEvent e):
+	DefaultChannelHandlerContext tail = getActualDownstreamContext(this.tail);
+        if (tail == null) {
+            try {
+                getSink().eventSunk(this, e);
+                return;
+            } catch (Throwable t) {
+                .....
+            }
+        }
+        sendDownstream(tail, e);
+DefaultChannelPipleine.sendDownstream(DefaultChannelHandlerContext ctx, ChannelEvent e):
+	((ChannelDownstreamHandler) ctx.getHandler()).handleDownstream(ctx, e);
+SimpleChannelDownstreamHandler.handleDownstream(ChannelHandlerContext ctx, ChannelEvent e):
+	if (e instanceof MessageEvent) {
+            writeRequested(ctx, (MessageEvent) e);
+        }else.......
+SimpleChannelDownstreamHandler.writeRequested(ChannelHandlerContext ctx, MessageEvent e):
+	自定义处理过程。
+	注意，这里不能将MessageEvent吞掉，而是最后要继续发给下一个ChannelHandlerContext（否则，MessageEvent到此为止，发不出去）。
+	几种方式：Channels.write(ctx, e.getFuture(), cb, e.getRemoteAddress());（私：重新new了一个MessageEvent，因为一般情况下			，MessageEvent中的message Object发生了变化。）
+		或ctx.sendDownstream(e);
+
+上面的继续发给下一个ChannelHandlerContext，下一个为null，则：
+NioServerSocketPipelineSink.eventSunk( ChannelPipeline pipeline, ChannelEvent e):
+	else if (channel instanceof NioSocketChannel) {
+            handleAcceptedSocket(e);
+        }
+NioServerSocketPipelineSink.handleAcceptedSocket(ChannelEvent e):
+	if (e instanceof ChannelStateEvent) {
+		......
+	}
+	else if (e instanceof MessageEvent) {
+            MessageEvent event = (MessageEvent) e;
+            NioSocketChannel channel = (NioSocketChannel) event.getChannel();
+            boolean offered = channel.writeBufferQueue.offer(event);
+            assert offered;
+            channel.worker.writeFromUserCode(channel);
+        }
+	
+	
