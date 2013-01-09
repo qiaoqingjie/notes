@@ -1,0 +1,31 @@
+chapter1
+
+1、线程问题：安全问题、活跃性问题（liveness正确的事最终会发生）、性能问题（context switch）。
+
+
+[[[[[[[[[[[[[[[[[
+p5 i++ 指令重排啥后果？
+]]]]]]]]]]]]]]]]]]]]]]]]]]]]]
+
+chapter2
+
+每个object都可以实现锁：内置锁（intrinsic lock）或监视器锁（monitor lock）
+
+重入
+
+chapter3
+
+1、synchronized：保证原子性或确定临界区（critical section）；内存可见性（memory visibility）。
+
+ps：重排序：只是发生在线程之间，线程a可能观察到线程b中的操作重排序；同一线程之内不存在这玩意。
+
+2、无同步情况下（无锁，非volatile）：
+最低安全性（out-of-thin-air safety）不适应与64位数值变量（long、double）。
+jvm允许将读、写64位数值分为两个32位操作。
+
+3、volatile不会重排序、不会被缓存在寄存器或对其他处理器不可见的地方。
+
+volatile除了保证自身内存可见，更重要的是：线程a在写入volatile变量之前对a可见的所有变量，在线程b读取volatile变量后，对b也是可见的。
+
+
+
