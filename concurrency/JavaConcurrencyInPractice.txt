@@ -1,4 +1,4 @@
-chapter1
+﻿chapter1
 
 1、线程问题：安全问题、活跃性问题（liveness正确的事最终会发生）、性能问题（context switch）。
 
@@ -26,6 +26,9 @@ jvm允许将读、写64位数值分为两个32位操作。
 3、volatile不会重排序、不会被缓存在寄存器或对其他处理器不可见的地方。
 
 volatile除了保证自身内存可见，更重要的是：线程a在写入volatile变量之前对a可见的所有变量，在线程b读取volatile变量后，对b也是可见的。
+
+4、发布（publish）、逸出（escape）。
+不要在构造过程中使this引用逸出：不要在构造函数中启动线程；构造函数中调用可改写的方法（非private、非final）也会造成this逸出。
 
 
 

@@ -10,6 +10,8 @@ DefaultChannelHandlerContext包含prev、next、name、ChannelHandler（ChannelU
 pipeline和channel是一对一的。pipeline和sink也是一对一。
 （DefaultChannelPipeline中有一个Channel、一个ChannelSink）
 
+（一个channel对应一个worker（一个worker对应多个channel），所以channel、pipeline、handler、framedecoder是线程安全的？？！）
+
 
 
  channel.getPipeline().sendUpstream(
@@ -59,7 +61,88 @@ readBytes(ChannelBuffer dst, int length)				yes	yes
 readBytes(ChannelBuffer dst)						yes	yes
 ================ChannelBuffer=========================================================================================
 
+[[[[[[[[[[[[[[[[[[[[[[[WrappedChannelBuffer[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[
 
+SlicedChannelBuffer
+	private final ChannelBuffer buffer;
+	private final int adjustment;
+	private final int length;
+	public SlicedChannelBuffer(ChannelBuffer buffer, int index, int length) {
+		if (index < 0 || index > buffer.capacity()) {
+		    throw new IndexOutOfBoundsException("Invalid index of " + index
+			    + ", maximum is " + buffer.capacity());
+		}
+
+		if (index + length > buffer.capacity()) {
+		    throw new IndexOutOfBoundsException("Invalid combined index of "
+			    + (index + length) + ", maximum is " + buffer.capacity());
+		}
+
+		this.buffer = buffer;
+		adjustment = index;
+		this.length = length;
+		writerIndex(length);
+	}
+
+TruncatedChannelBuffer
+	private final ChannelBuffer buffer;
+	private final int length;
+	public TruncatedChannelBuffer(ChannelBuffer buffer, int length) {
+		if (length > buffer.capacity()) {
+		    throw new IndexOutOfBoundsException("Length is too large, got "
+			    + length + " but can't go higher than " + buffer.capacity());
+		}
+
+		this.buffer = buffer;
+		this.length = length;
+		writerIndex(length);
+	}
+
+DuplicatedChannelBuffer	
+	private final ChannelBuffer buffer;
+	public DuplicatedChannelBuffer(ChannelBuffer buffer) {
+		if (buffer == null) {
+		    throw new NullPointerException("buffer");
+		}
+		this.buffer = buffer;
+		setIndex(buffer.readerIndex(), buffer.writerIndex());
+	}
+
+总结：
+DuplicatedChannelBuffer、TruncatedChannelBuffer、SlicedChannelBuffer都与buffer共享底层存储如数组等；
+	readerIndex、writerIndex都是独立的。
+DuplicatedChannelBuffer的readerIndex、writerIndex与buffer的值相同。
+TruncatedChannelBuffer、SlicedChannelBuffer都是readerIndex == 0；writerIndex == length。
+TruncatedChannelBuffer与SlicedChannelBuffer相比，没有adjustment，（可以看做adjustment==0）
+
+TruncatedChannelBuffer(buffer,length) 《=》 SlicedChannelBuffer(buffer,0,length)
+
+DuplicatedChannelBuffer是复制一个ChannelBuffer，readerIndex、writerIndex独立，但值相同；共享。
+TruncatedChannelBuffer
+
+duplicate()	《=》 buf.slice(0, buf.capacity())
+slice()		《=》 buf.slice(buf.readerIndex(), buf.readableBytes())
+
+copy()		《=》 buf.copy(buf.readerIndex(), buf.readableBytes())	（copy结果与buffer不共享底层存储）
+
+
+===================为何用input.slice()得到一套独立的readerIndex、writerIndex？==============================
+FrameDecoder.messageReceived(ChannelHandlerContext ctx, MessageEvent e)中：
+	try {
+            callDecode(ctx, e.getChannel(), input, e.getRemoteAddress());
+        } finally {
+            updateCumulation(ctx, input);
+        }
+在updateCumulation(ctx, input)中：
+	cumulation = newCumulation = input.slice();
+问题：为何用input.slice()得到一套独立的readerIndex、writerIndex？
+原因：在callDecode(ctx, e.getChannel(), input, e.getRemoteAddress());中：
+	Object frame = decode(context, channel, cumulation);
+返回的frame可能包含cumulation（就是input），后续的处理过程会对其读写操作；而这里的cumulation将input剩余的部分保存起来，后面也会有读写操作，两者冲突。
+======================================================================================================================
+
+
+]]]]]]]]]]]]]]]]]]]]]]]]]]WrappedChannelBuffer]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]
 
 
 ===============problems============= 
