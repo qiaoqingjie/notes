@@ -15,13 +15,22 @@ quorumVerifier:
 zoo.cfg:
 	...
 	dynamicConfigFile
+	
 dynamicConfigFile：
 	group（必须要包含所有PARTICIPANT类型的server）
 	weight
-	server.（这里的value（host:port:electionPort[:type]）中可以配置clientAddr（port或host:port，没有host则用server的value中的host），用;与前面的addr隔开，覆盖zoo.cfg中的配置）
-	version
+	server.（这里的value（host:port:electionPort[:type]）中可以配置clientAddr（port或host:port，没有host则用server的value中的host），用;与前面的addr隔开。(若zoo.cfg中配置了，则两者必须一致，否则报错））
+	version（QuorumVerifier的version）
 ]	
 
+[server类型:
+public enum LearnerType {
+        PARTICIPANT, OBSERVER;
+    }
+]
 
+[?????????????????????????
+dynamicConfigFileStr + ".next" (lastSeenQuorumVerifier是干嘛的？)
+]
 
 
