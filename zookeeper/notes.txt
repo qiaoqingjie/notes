@@ -1,0 +1,27 @@
+The deafult weight of a server is 1
+[3.4.5:
+quorumVerifier:
+	1\serverGroup.size() > 0：QuorumHierarchical：包含半数以上group，并且其中每个group的总权值大于配置的group的总权值的一半。
+	2\QuorumMaj：包含半数以上server数
+]
+
+[trunk:
+配置文件中有key为group或weight：QuorumHierarchical
+否则：QuorumMaj
+
+]
+
+[
+zoo.cfg:
+	...
+	dynamicConfigFile
+dynamicConfigFile：
+	group（要包涵所有PARTICIPANT类型的server）
+	weight
+	server.（这里的value（host:port:electionPort[:type]）中可以配置clientAddr（port或host:port，没有host则用server的value中的host），用;与前面的addr隔开，覆盖zoo.cfg中的配置）
+	version
+]	
+
+
+
+
