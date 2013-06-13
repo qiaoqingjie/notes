@@ -28,9 +28,21 @@ public enum LearnerType {
         PARTICIPANT, OBSERVER;
     }
 ]
+[public enum ServerState {
+        LOOKING, FOLLOWING, LEADING, OBSERVING;
+    }
+]
 
 [?????????????????????????
 dynamicConfigFileStr + ".next" (lastSeenQuorumVerifier是干嘛的？)
 ]
 
+
+[
+ServerCnxnFactory
+	NettyServerCnxnFactory
+	NIOServerCnxnFactory
+	NullServerCnxnFactory
+]
+[protected int maxClientCnxns = 60;]
 
