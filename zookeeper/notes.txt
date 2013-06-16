@@ -46,3 +46,20 @@ ServerCnxnFactory
 ]
 [protected int maxClientCnxns = 60;]
 
+[这是干啥用的??
+TrieNode:
+PathTrie:每级对应一个节点
+	addPath:将最后一个节点property设为true。
+	deletePath：如果要删除的path最后一个节点中children只有一个，则删除该节点（及其子节点）；否则，只设置最后一个节点property为false。
+	findMaxPrefix：找到与path重合的路径中，最长的路径，使得最后一个节点的property为true。
+]
+
+
+
+
+
+
+
+
+
+
