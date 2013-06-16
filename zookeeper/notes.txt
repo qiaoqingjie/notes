@@ -46,7 +46,7 @@ ServerCnxnFactory
 ]
 [protected int maxClientCnxns = 60;]
 
-[这是干啥用的??
+[PathTrie是干啥用的??
 TrieNode:
 PathTrie:每级对应一个节点
 	addPath:将最后一个节点property设为true。
