@@ -46,12 +46,28 @@ ServerCnxnFactory
 ]
 [protected int maxClientCnxns = 60;]
 
-[PathTrie是干啥用的??
+[PathTrie
 TrieNode:
 PathTrie:每级对应一个节点
 	addPath:将最后一个节点property设为true。
 	deletePath：如果要删除的path最后一个节点中children只有一个，则删除该节点（及其子节点）；否则，只设置最后一个节点property为false。
 	findMaxPrefix：找到与path重合的路径中，最长的路径，使得最后一个节点的property为true。
+]
+
+[??????????????!!!!!!!!!!!!!!!!!!!!!
+DataNode
+void copyStat(Stat to)
+
+// when we do the Cversion we need to translate from the count of the creates
+        // to the count of the changes (v3 semantics)
+        // for every create there is a delete except for the children still present
+        to.setCversion(stat.getCversion()*2 - numChildren);
+ps:DataNode中的StatPersisted stat中的cversion只是create的计数，不包含delete；copyStat中，to的cversion包含了delete的计数，转换方法就是上面的。
+]
+
+[??????????????????
+Util.isValidSnapshot
+RandomAccessFile读取最后n个byte，可能会出现只读取到少于n个byte的情况？？？
 ]
 
 
