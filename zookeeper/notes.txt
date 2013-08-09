@@ -70,7 +70,85 @@ Util.isValidSnapshot
 RandomAccessFile读取最后n个byte，可能会出现只读取到少于n个byte的情况？？？
 ]
 
+[???????????????????????
+FileTxnLog.getLogFiles(File[] logDirList,long snapshotZxid)为啥实现的那么复杂，用>=不久完事了吗？（返回>=snapshotZxid的文件）
+]
 
+[
+对DataNode n的操作(读写)，全部用synchronized(n){...}
+]
+
+
+[??????????????????????????
+/**
+         * this is to avoid the jvm bug:
+         * NullPointerException in Selector.open()
+         * http://bugs.sun.com/view_bug.do?bug_id=6427854
+         */
+        try {
+            Selector.open().close();
+        } catch(IOException ie) {
+            LOG.error("Selector failed to open", ie);
+        }
+
+]
+
+
+[toooooooooooooooooooooooo
+ConnectionExpirerThread
+ExpiryQueue
+]
+
+
+
+[FLE
+任意两个节点间有且只有一个socket连接，都是sid小的做server，sid大的做client。
+
+
+]
+
+
+[???????????????????????????????????????????
+QuorumConnectionManager.receiveConnection(Socket sock)中：
+int num_read = din.read(b);
+有问题：din.read(b)读取字节数不确定吧？咋不用readFully或者while(r = din.read(b) != -1)?
+if (num_read == num_remaining_bytes) {
+
+
+===================
+QuorumConnectionManager.RecvWorker.run()中：
+	byte[] msgArray = new byte[length];
+        din.readFully(msgArray, 0, length);
+        ByteBuffer message = ByteBuffer.wrap(msgArray);
+]
+
+
+[??????????????????????????????????????????
+QuorumConnectionManager.SendWorker.send(ByteBuffer b):
+ 	try {
+                b.position(0);
+                b.get(msgBytes);
+            } catch (BufferUnderflowException be) {
+                LOG.error("BufferUnderflowException ", be);
+                return;
+            }	
+有啥用？？？？？？？？？？
+]
+
+[
+ConcurrentHashMap<Long, ArrayBlockingQueue<ByteBuffer>> queueSendMap 
+一个thread放(FastLeaderElection.WorkerSender从sendqueue中取，放入manager的queueSendMap（QuorumConnectionManager.toSend(Long sid, ByteBuffer b)）)，
+一个thread取(每个sid对应一个QuorumConnectionManager.SendWorker)
+所以ArrayBlockingQueue<ByteBuffer>不需要lock
+]
+
+[
+ArrayBlockingQueue<Message> recvQueue
+放：
+	自己(QuorumConnectionManager.toSend(Long sid, ByteBuffer b)中，if (self.getId() == sid) {b.position(0);addToRecvQueue(new Message(b.duplicate(), sid));)。。。；
+	。。。
+取：
+]
 
 
 
