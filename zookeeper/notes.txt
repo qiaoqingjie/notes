@@ -154,5 +154,33 @@ ArrayBlockingQueue<Message> recvQueue
 
 
 
+[QuorumCnxManager: a connection manager for leader election using TCP
+	ArrayBlockingQueue<Message> recvQueue;
+	ConcurrentHashMap<Long, ArrayBlockingQueue<ByteBuffer>> queueSendMap;
+
+QuorumCnxManager.Listener:(extends Thread)
+	ServerSocket监听electinAddr，when accept a socket, read protocolVersion/sid/electionAddr(host:port) from it, if sid < self.getId(), close it and call connectOne(sid, electionAddr);
+		else, create 2 threads, SendWorker and RecvWorker and start them(before start, close the old 2 threads if exist). 
+
+QuorumCnxManager.SendWorker:
+	从ConcurrentHashMap<Long, ArrayBlockingQueue<ByteBuffer>> queueSendMap找到ArrayBlockingQueue<ByteBuffer>，poll出ByteBuffer，lastMessageSent.put(sid, b)，写入socket。
+QuorumCnxManager.RecvWorker:
+	从socket阻塞读数据，ByteBuffer message = ByteBuffer.wrap(msgArray)，new Message(message.duplicate(), sid)，addToRecvQueue(message)
+
+QuorumCnxManager.toSend(Long sid, ByteBuffer b):
+	如果self.getId() == sid，放到
+
+QuorumCnxManager.addToRecvQueue(Message msg)：
+	在recvQLock同步下，如果recvQueue.remainingCapacity() == 0，就recvQueue.remove()，然后recvQueue.add(msg)。
+]
 
 
+
+[FastLeaderElection
+FastLeaderElection.Messenger:
+	启动WorkerSender和WorkerReceiver两个thread
+FastLeaderElection.Messenger.WorkerSender：
+	ToSend m = sendqueue.poll(3000, TimeUnit.MILLISECONDS), 构造ByteBuffer，manager.toSend(m.sid, requestBuffer);
+
+
+]
