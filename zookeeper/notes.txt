@@ -145,8 +145,8 @@ ConcurrentHashMap<Long, ArrayBlockingQueue<ByteBuffer>> queueSendMap
 [
 ArrayBlockingQueue<Message> recvQueue
 放：
-	自己(QuorumConnectionManager.toSend(Long sid, ByteBuffer b)中，if (self.getId() == sid) {b.position(0);addToRecvQueue(new Message(b.duplicate(), sid));)。。。；
-	。。。
+	FastLeaderElection.Messenger.WorkerSender，如果发给自己，放入recvQueue；
+	QuorumCnxManager.RecvWorker，放入recvQueue；（自己和每个quorum peer都有一个socket，对应一个RecvWorker；
 取：
 ]
 
@@ -155,6 +155,7 @@ ArrayBlockingQueue<Message> recvQueue
 
 
 [QuorumCnxManager: a connection manager for leader election using TCP
+
 	ArrayBlockingQueue<Message> recvQueue;
 	ConcurrentHashMap<Long, ArrayBlockingQueue<ByteBuffer>> queueSendMap;
 
@@ -168,19 +169,24 @@ QuorumCnxManager.RecvWorker:
 	从socket阻塞读数据，ByteBuffer message = ByteBuffer.wrap(msgArray)，new Message(message.duplicate(), sid)，addToRecvQueue(message)
 
 QuorumCnxManager.toSend(Long sid, ByteBuffer b):
-	如果self.getId() == sid，放到
+	如果self.getId() == sid，addToRecvQueue(new Message(b.duplicate(), sid));
+	如果queueSendMap.containsKey(sid)，ArrayBlockingQueue<ByteBuffer> bq = queueSendMap.get(sid)，否则新建一个new ArrayBlockingQueue<ByteBuffer>(SEND_CAPACITY)并放入queueSendMap，addToSendQueue(bq, b);
+	
 
-QuorumCnxManager.addToRecvQueue(Message msg)：
+QuorumCnxManager.addToRecvQueue(Message msg)：(recvQueue capacity 是100)
 	在recvQLock同步下，如果recvQueue.remainingCapacity() == 0，就recvQueue.remove()，然后recvQueue.add(msg)。
+QuorumCnxManager.addToSendQueue(ArrayBlockingQueue<ByteBuffer> queue,ByteBuffer buffer):(SEND_CAPACITY是1）
+	如果queue.remainingCapacity() == 0,就queue.remove();然后queue.add(buffer);
 ]
 
 
 
 [FastLeaderElection
+
 FastLeaderElection.Messenger:
 	启动WorkerSender和WorkerReceiver两个thread
 FastLeaderElection.Messenger.WorkerSender：
 	ToSend m = sendqueue.poll(3000, TimeUnit.MILLISECONDS), 构造ByteBuffer，manager.toSend(m.sid, requestBuffer);
-
+FastLeaderElection.Messenger.WorkerReceiver:
 
 ]
