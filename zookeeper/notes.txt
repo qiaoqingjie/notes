@@ -23,6 +23,47 @@ dynamicConfigFile：
 	version（QuorumVerifier的version）
 ]	
 
+
+[cfg
+
+
+]
+
+[dynamicConfigFile
+
+group.1=1:2:3
+group.2=4:5:6
+
+weight.1=100
+weight.2=50
+
+server.1=host:port:port
+server.1=host:port:port:type
+server.1=host:port:port:type;port
+server.1=host:port:port:type;host:port
+
+version=0
+
+格式：
+server.sid=host1:port1:port2[:type][;[host2:]port3]
+	type取值:observer participant
+	分号后的host没有，就用前面的host
+
+group.gid=sid(:sid)*
+weight.sid=n
+	sid gid n 都是long类型
+	对participant类型的所有server，必须包含在group中（否则报错）；如果没配置weight，默认为1。
+
+
+QuorumServer.addr	host1:port1
+QuorumServer.electionAddr	host1:port2
+QuorumServer.clientAddr	(host2 | host1):port3
+
+]
+
+
+
+
 [server类型:
 public enum LearnerType {
         PARTICIPANT, OBSERVER;
@@ -146,7 +187,7 @@ ConcurrentHashMap<Long, ArrayBlockingQueue<ByteBuffer>> queueSendMap
 ArrayBlockingQueue<Message> recvQueue
 放：
 	FastLeaderElection.Messenger.WorkerSender，如果发给自己，放入recvQueue；
-	QuorumCnxManager.RecvWorker，放入recvQueue；（自己和每个quorum peer都有一个socket，对应一个RecvWorker；
+	QuorumCnxManager.RecvWorker，放入recvQueue；（自己和每个quorum peer都有一个socket，对应一个RecvWorker)
 取：
 ]
 
@@ -188,5 +229,5 @@ FastLeaderElection.Messenger:
 FastLeaderElection.Messenger.WorkerSender：
 	ToSend m = sendqueue.poll(3000, TimeUnit.MILLISECONDS), 构造ByteBuffer，manager.toSend(m.sid, requestBuffer);
 FastLeaderElection.Messenger.WorkerReceiver:
-
+	Message response = manager.pollRecvQueue(3000, TimeUnit.MILLISECONDS);
 ]
