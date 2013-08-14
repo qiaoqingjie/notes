@@ -61,6 +61,10 @@ QuorumServer.clientAddr	(host2 | host1):port3
 
 ]
 
+[.next
+如果cfg中有dynamicConfigFile，并且File nextDynamicConfigFile = new File(dynamicConfigFileStr + ".next"); nextDynamicConfigFile.exists()，则lastSeenQuorumVerifier = createQuorumVerifier(dynamicConfigNextCfg, isHierarchical); 
+]
+
 
 
 
@@ -205,7 +209,7 @@ QuorumCnxManager.Listener:(extends Thread)
 		else, create 2 threads, SendWorker and RecvWorker and start them(before start, close the old 2 threads if exist). 
 
 QuorumCnxManager.SendWorker:
-	从ConcurrentHashMap<Long, ArrayBlockingQueue<ByteBuffer>> queueSendMap找到ArrayBlockingQueue<ByteBuffer>，poll出ByteBuffer，lastMessageSent.put(sid, b)，写入socket。
+	从ConcurrentHashMap<Long, ArrayBlockingQueue<ByteBuffer>> queueSendMap找到ArrayBlockingQueue<ByteBuffer>(SEND_CAPACITY是1,why?????????)，poll出ByteBuffer，lastMessageSent.put(sid, b)，写入socket。
 QuorumCnxManager.RecvWorker:
 	从socket阻塞读数据，ByteBuffer message = ByteBuffer.wrap(msgArray)，new Message(message.duplicate(), sid)，addToRecvQueue(message)
 
@@ -216,7 +220,7 @@ QuorumCnxManager.toSend(Long sid, ByteBuffer b):
 
 QuorumCnxManager.addToRecvQueue(Message msg)：(recvQueue capacity 是100)
 	在recvQLock同步下，如果recvQueue.remainingCapacity() == 0，就recvQueue.remove()，然后recvQueue.add(msg)。
-QuorumCnxManager.addToSendQueue(ArrayBlockingQueue<ByteBuffer> queue,ByteBuffer buffer):(SEND_CAPACITY是1）
+QuorumCnxManager.addToSendQueue(ArrayBlockingQueue<ByteBuffer> queue,ByteBuffer buffer):(SEND_CAPACITY是1）(why1????????????????????????????????????????????????)
 	如果queue.remainingCapacity() == 0,就queue.remove();然后queue.add(buffer);
 ]
 
@@ -230,4 +234,14 @@ FastLeaderElection.Messenger.WorkerSender：
 	ToSend m = sendqueue.poll(3000, TimeUnit.MILLISECONDS), 构造ByteBuffer，manager.toSend(m.sid, requestBuffer);
 FastLeaderElection.Messenger.WorkerReceiver:
 	Message response = manager.pollRecvQueue(3000, TimeUnit.MILLISECONDS);
+	如果!self.getVotingView().containsKey(response.sid)，
+		则将自己当前所认为的leader（self.getCurrentVote()）立即发过去（sendqueue.offer(notmsg)）；
+	否则，
+		如果self.getPeerState() == QuorumPeer.ServerState.LOOKING，
+			则recvqueue.offer(n);
+			如果对方在looking，并且对方的electionEpoch < 我的logicalclock，
+				则将proposedLeader, proposedZxid, proposedEpoch发过去。（sendqueue.offer(notmsg)）
+		否则，
+			如果对方在looking，
+				则将自己当前所认为的leader（self.getCurrentVote()）立即发过去（sendqueue.offer(notmsg)）；
 ]
