@@ -180,14 +180,14 @@ QuorumConnectionManager.SendWorker.send(ByteBuffer b):
 有啥用？？？？？？？？？？
 ]
 
-[
+[QuorumCnxManager
 ConcurrentHashMap<Long, ArrayBlockingQueue<ByteBuffer>> queueSendMap 
 一个thread放(FastLeaderElection.WorkerSender从sendqueue中取，放入manager的queueSendMap（QuorumConnectionManager.toSend(Long sid, ByteBuffer b)）)，
 一个thread取(每个sid对应一个QuorumConnectionManager.SendWorker)
 所以ArrayBlockingQueue<ByteBuffer>不需要lock
 ]
 
-[
+[QuorumCnxManager
 ArrayBlockingQueue<Message> recvQueue
 放：
 	FastLeaderElection.Messenger.WorkerSender，如果发给自己，放入recvQueue；
@@ -244,4 +244,19 @@ FastLeaderElection.Messenger.WorkerReceiver:
 		否则，
 			如果对方在looking，
 				则将自己当前所认为的leader（self.getCurrentVote()）立即发过去（sendqueue.offer(notmsg)）；
+]
+
+[????????????????????
+FLE咋感觉不是类paxos呢？？？？？木有paxos的特征？？？？？淘宝的人居然说FLE是fast paxos？？？？？？
+]
+
+[FastLeaderElection.lookForLeader()
+	HashMap<Long, Vote> recvset = new HashMap<Long, Vote>();
+	HashMap<Long, Vote> outofelection = new HashMap<Long, Vote>();
+	synchronized(this){
+                logicalclock++;
+                updateProposal(getInitId(), getInitLastLoggedZxid(), getPeerEpoch());
+        }
+	sendNotifications();
+	.............
 ]
