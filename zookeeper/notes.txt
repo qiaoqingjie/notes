@@ -260,3 +260,18 @@ FLE咋感觉不是类paxos呢？？？？？木有paxos的特征？？？？？�
 	sendNotifications();
 	.............
 ]
+
+[toooooooooooooooooooooooooooooooooooooooooo0000000000
+QuorumPeer.run()
+	readonlymode.enabled
+
+
+]
+
+
+
+[
+lastProcessedZxid <= currentEpoch <= acceptedEpoch
+后两个各自写入同名文件中，启动时从文件中读，如果没有，设置为lastProcessedZxid对应的值，并写入文件。
+]
+
