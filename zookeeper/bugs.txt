@@ -1,0 +1,18 @@
+[
+QuorumPeerConfig.writeDynamicConfig中，如果是configBackwardCompatibilityMode，将clientPort clientPortAddress从static cfg中去掉了，但是没有写入dynamic cfg中!(QuorumVerifier.toString)
+]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

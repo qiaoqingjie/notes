@@ -23,6 +23,51 @@ dynamicConfigFile：
 	version（QuorumVerifier的version）
 ]	
 
+
+[cfg
+
+
+]
+
+[dynamicConfigFile
+
+group.1=1:2:3
+group.2=4:5:6
+
+weight.1=100
+weight.2=50
+
+server.1=host:port:port
+server.1=host:port:port:type
+server.1=host:port:port:type;port
+server.1=host:port:port:type;host:port
+
+version=0
+
+格式：
+server.sid=host1:port1:port2[:type][;[host2:]port3]
+	type取值:observer participant
+	分号后的host没有，就用前面的host
+
+group.gid=sid(:sid)*
+weight.sid=n
+	sid gid n 都是long类型
+	对participant类型的所有server，必须包含在group中（否则报错）；如果没配置weight，默认为1。
+
+
+QuorumServer.addr	host1:port1
+QuorumServer.electionAddr	host1:port2
+QuorumServer.clientAddr	(host2 | host1):port3
+
+]
+
+[.next
+如果cfg中有dynamicConfigFile，并且File nextDynamicConfigFile = new File(dynamicConfigFileStr + ".next"); nextDynamicConfigFile.exists()，则lastSeenQuorumVerifier = createQuorumVerifier(dynamicConfigNextCfg, isHierarchical); 
+]
+
+
+
+
 [server类型:
 public enum LearnerType {
         PARTICIPANT, OBSERVER;
@@ -135,18 +180,18 @@ QuorumConnectionManager.SendWorker.send(ByteBuffer b):
 有啥用？？？？？？？？？？
 ]
 
-[
+[QuorumCnxManager
 ConcurrentHashMap<Long, ArrayBlockingQueue<ByteBuffer>> queueSendMap 
 一个thread放(FastLeaderElection.WorkerSender从sendqueue中取，放入manager的queueSendMap（QuorumConnectionManager.toSend(Long sid, ByteBuffer b)）)，
 一个thread取(每个sid对应一个QuorumConnectionManager.SendWorker)
 所以ArrayBlockingQueue<ByteBuffer>不需要lock
 ]
 
-[
+[QuorumCnxManager
 ArrayBlockingQueue<Message> recvQueue
 放：
 	FastLeaderElection.Messenger.WorkerSender，如果发给自己，放入recvQueue；
-	QuorumCnxManager.RecvWorker，放入recvQueue；（自己和每个quorum peer都有一个socket，对应一个RecvWorker；
+	QuorumCnxManager.RecvWorker，放入recvQueue；（自己和每个quorum peer都有一个socket，对应一个RecvWorker)
 取：
 ]
 
@@ -164,7 +209,7 @@ QuorumCnxManager.Listener:(extends Thread)
 		else, create 2 threads, SendWorker and RecvWorker and start them(before start, close the old 2 threads if exist). 
 
 QuorumCnxManager.SendWorker:
-	从ConcurrentHashMap<Long, ArrayBlockingQueue<ByteBuffer>> queueSendMap找到ArrayBlockingQueue<ByteBuffer>，poll出ByteBuffer，lastMessageSent.put(sid, b)，写入socket。
+	从ConcurrentHashMap<Long, ArrayBlockingQueue<ByteBuffer>> queueSendMap找到ArrayBlockingQueue<ByteBuffer>(SEND_CAPACITY是1,why?????????)，poll出ByteBuffer，lastMessageSent.put(sid, b)，写入socket。
 QuorumCnxManager.RecvWorker:
 	从socket阻塞读数据，ByteBuffer message = ByteBuffer.wrap(msgArray)，new Message(message.duplicate(), sid)，addToRecvQueue(message)
 
@@ -175,7 +220,7 @@ QuorumCnxManager.toSend(Long sid, ByteBuffer b):
 
 QuorumCnxManager.addToRecvQueue(Message msg)：(recvQueue capacity 是100)
 	在recvQLock同步下，如果recvQueue.remainingCapacity() == 0，就recvQueue.remove()，然后recvQueue.add(msg)。
-QuorumCnxManager.addToSendQueue(ArrayBlockingQueue<ByteBuffer> queue,ByteBuffer buffer):(SEND_CAPACITY是1）
+QuorumCnxManager.addToSendQueue(ArrayBlockingQueue<ByteBuffer> queue,ByteBuffer buffer):(SEND_CAPACITY是1）(why1????????????????????????????????????????????????)
 	如果queue.remainingCapacity() == 0,就queue.remove();然后queue.add(buffer);
 ]
 
@@ -188,5 +233,45 @@ FastLeaderElection.Messenger:
 FastLeaderElection.Messenger.WorkerSender：
 	ToSend m = sendqueue.poll(3000, TimeUnit.MILLISECONDS), 构造ByteBuffer，manager.toSend(m.sid, requestBuffer);
 FastLeaderElection.Messenger.WorkerReceiver:
+	Message response = manager.pollRecvQueue(3000, TimeUnit.MILLISECONDS);
+	如果!self.getVotingView().containsKey(response.sid)，
+		则将自己当前所认为的leader（self.getCurrentVote()）立即发过去（sendqueue.offer(notmsg)）；
+	否则，
+		如果self.getPeerState() == QuorumPeer.ServerState.LOOKING，
+			则recvqueue.offer(n);
+			如果对方在looking，并且对方的electionEpoch < 我的logicalclock，
+				则将proposedLeader, proposedZxid, proposedEpoch发过去。（sendqueue.offer(notmsg)）
+		否则，
+			如果对方在looking，
+				则将自己当前所认为的leader（self.getCurrentVote()）立即发过去（sendqueue.offer(notmsg)）；
+]
+
+[????????????????????
+FLE咋感觉不是类paxos呢？？？？？木有paxos的特征？？？？？淘宝的人居然说FLE是fast paxos？？？？？？
+]
+
+[FastLeaderElection.lookForLeader()
+	HashMap<Long, Vote> recvset = new HashMap<Long, Vote>();
+	HashMap<Long, Vote> outofelection = new HashMap<Long, Vote>();
+	synchronized(this){
+                logicalclock++;
+                updateProposal(getInitId(), getInitLastLoggedZxid(), getPeerEpoch());
+        }
+	sendNotifications();
+	.............
+]
+
+[toooooooooooooooooooooooooooooooooooooooooo0000000000
+QuorumPeer.run()
+	readonlymode.enabled
+
 
 ]
+
+
+
+[
+lastProcessedZxid <= currentEpoch <= acceptedEpoch
+后两个各自写入同名文件中，启动时从文件中读，如果没有，设置为lastProcessedZxid对应的值，并写入文件。
+]
+
