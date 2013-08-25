@@ -316,14 +316,14 @@ lastProcessedZxid <= currentEpoch <= acceptedEpoch
 选举用sid lastProcessedZxid currentEpoch，只读，不会对其值修改。
 
 Phase 1: Establish an epoch中，用acceptedEpoch
-	leader选出半数以上follower的最大的acceptedEpoch为新的epoch；在等到半数以上ack后，设置currentEpoch为epoch。
+	leader选出半数以上follower(第一次wait)的最大的acceptedEpoch为新的epoch；在等到半数以上ack后（第二次wait），设置currentEpoch为epoch。
 	follower:设置acceptedEpoch为上面的epoch。
 
 
-
+第三次wait：waitForNewLeaderAck，等待多数sync的follower
 ]
 
-[???????????????????????????????????????????????????????????????????哪里设置了lastProcessedZxid？？？？？？？？！！！！！！！！！！！！！！！！
+[???????????????????????????????????????????????????????????????????leader哪里设置了lastProcessedZxid？？？？？？？？
 LearnerHandler
 public boolean syncFollower(long peerLastZxid, ZKDatabase db, Leader leader) {
         /*
@@ -331,16 +331,36 @@ public boolean syncFollower(long peerLastZxid, ZKDatabase db, Leader leader) {
          * lastProcessedZxid to be (epoch < 32). There will be no txn associated
          * with this zxid.
          *
+         * The learner will set its lastProcessedZxid to the same value if
+         * it get DIFF or SNAP from the leader. If the same learner come
+         * back to sync with leader using this zxid, we will never find this
+         * zxid in our history. In this case, we will ignore TRUNC logic and
+         * always send DIFF if we have old enough history
+         */
 
-！！！！！！！！！！！！！！！！！！！！！！！
+！！
 follower在接收到leader的opPacket（DIFF TRUNK SNAP）并完成后，zk.getZKDatabase().setlastProcessedZxid(qp.getZxid());
 ]
 
 
-[tooooooooooooooooooooooooooooooo
-
-FileTxnIterator 彻底总结！！！！！
-
+[
+FileTxnIterator(File logDir, long zxid, boolean fastForward)
+	得到一个可以从zxid开始的iterator
 
 ]
+
+
+[????????????????????????????????????????????为啥多组？并且多组同时containsQuorum？
+Leader.Proposal:
+ public boolean hasAllQuorums() {
+            for (QuorumVerifierAcksetPair qvAckset : qvAcksetPairs) {
+                if (!qvAckset.getQuorumVerifier().containsQuorum(qvAckset.getAckset()))
+                    return false;
+            }
+            return true;
+        }
+
+]
+
+
 
