@@ -312,12 +312,14 @@ lastProcessedZxid <= currentEpoch <= acceptedEpoch
 后两个各自写入同名文件中，启动时从文件中读，如果没有，设置为lastProcessedZxid对应的值，并写入文件。
 ]
 
-[
+[tooooooooooooooooooooooooooooooooooooooooooooooooo思考
 选举用sid lastProcessedZxid currentEpoch，只读，不会对其值修改。
 
 Phase 1: Establish an epoch中，用acceptedEpoch
 	leader选出半数以上follower(第一次wait)的最大的acceptedEpoch为新的epoch；在等到半数以上ack后（第二次wait），设置currentEpoch为epoch。
 	follower:设置acceptedEpoch为上面的epoch。
+		在接收到leader的opPacket（DIFF TRUNK SNAP）并完成后，zk.getZKDatabase().setlastProcessedZxid(qp.getZxid());
+		在受到NEWLEADER的packet后，self.setLastSeenQuorumVerifier， zk.takeSnapshot(); self.setCurrentEpoch(newEpoch);
 
 
 第三次wait：waitForNewLeaderAck，等待多数sync的follower
@@ -340,6 +342,7 @@ public boolean syncFollower(long peerLastZxid, ZKDatabase db, Leader leader) {
 
 ！！
 follower在接收到leader的opPacket（DIFF TRUNK SNAP）并完成后，zk.getZKDatabase().setlastProcessedZxid(qp.getZxid());
+在受到NEWLEADER的packet后，self.setLastSeenQuorumVerifier， zk.takeSnapshot(); self.setCurrentEpoch(newEpoch);
 ]
 
 
@@ -362,5 +365,44 @@ Leader.Proposal:
 
 ]
 
+[？？？？？？
+follower:
+	snap:只修改内存db，不修改文件；
+	trunc:只修改txnLog文件，不修改snap文件，说明snap中不可能出现需要trunc的proposal？多数accept了后才会被snap？否则，第二次loadDatabase还会从snap中读到被trunc的proposal！！！！！！！！
+
+
+
+]
+
+
+[tooooooooooooooooooooooooooooooooo
+SessionTracker
+
+]
+
+[
+AtomicFileOutputStream
+
+force/sync:
+http://stackoverflow.com/questions/730521/really-force-file-sync-flush-in-java
+http://stackoverflow.com/questions/5650327/are-filechannel-force-and-filedescriptor-sync-both-needed
+http://stackoverflow.com/questions/14011398/do-i-need-filedescriptor-sync-and-mappedbytebuffer-force/14011754#14011754
+
+renameTo():
+http://stackoverflow.com/questions/17715726/in-java-1-6-file-renameto-atomic-on-linux/17715859#17715859
+在windows下，target存在，则rename会失败？可以先delete再renameTo：
+http://stackoverflow.com/questions/1000183/reliable-file-renameto-alternative-on-windows
+]
+
+[tooooooooooooooooooooooooooooooooooooooooooooo
+leader.lead()等地方调用了lastSeenQuorumVerifier的方法，即肯定不会为null，那先前在哪里设置了值？啥值？
+
+]
+
+[toooooooooooooooooooooooooooooo
+reconfig
+
+
+]
 
 
