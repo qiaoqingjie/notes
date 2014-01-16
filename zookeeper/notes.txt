@@ -405,4 +405,79 @@ reconfig
 
 ]
 
+[ExpiryQueue
+将timeout延长到下一个expirationInterval，只要一个thread按照expirationInterval时间间隔进行expire操作。
+
+用currentTimeMillis，server时间突然变大后，大面积expire？???????????
+]
+
+[
+32cores：
+1 accept thread：接受到SocketChannel，注册到selector得到key，新建NIOServerCnxn并attach到key上。
+4 selector threads：对SocketChannel进行select，有读写请求，就扔给worker的thread pool。所以，NIOServerCnxn并不是固定在一个线程中使用，所以要考虑线程安全问题。
+(????????????????????????????????????????????????????????？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？？
+NIOServerCnxn的各种字段如initialized都没有安全措施，所有有线程安全问题？？？？？？？？！！！！！！！！！！！！！！！！！！！！！！！！！！
+)
+64worker threads:对SocketChannel进行读写操作。
+
+]
+
+[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[readPayload -> readConnectRequest[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]
+[NIOServerCnxn.readConnectRequest
+NIOServerCnxn.zkServer来自NIOServerCnxnFactory.zkServer，
+NIOServerCnxnFactory.zkServer啥子时候赋的值？
+	Leader.lead()中，waitForNewLeaderAck后startZkServer后self.cnxnFactory.setZooKeeperServer(zk);
+	Leaner.syncWithLeader中，UPTODATE后self.cnxnFactory.setZooKeeperServer(zk);
+]
+
+[NIOServerCnxn.readConnectRequest
+client不会连到比自己的LastZxidSeen小的server上：
+ if (connReq.getLastZxidSeen() > zkDb.dataTree.lastProcessedZxid) {
+            String msg = "Refusing session request for client "
+                + cnxn.getRemoteSocketAddress()
+                + " as it has seen zxid 0x"
+                + Long.toHexString(connReq.getLastZxidSeen())
+                + " our last zxid is 0x"
+                + Long.toHexString(getZKDatabase().getDataTreeLastProcessedZxid())
+                + " client must try another server";
+
+            LOG.info(msg);
+            throw new CloseRequestException(msg);
+        }
+]
+
+[
+minSessionTimeout == -1 ? tickTime * 2 : minSessionTimeout;
+maxSessionTimeout == -1 ? tickTime * 20 : maxSessionTimeout;
+sessionTimeout = sessionTimeout < minSessionTimeout ? minSessionTimeout : sessionTimeout;
+sessionTimeout = sessionTimeout > maxSessionTimeout ? maxSessionTimeout : sessionTimeout;
+]
+
+[
+worker doIo时，disableSelectable，啥时候enable的？
+======>在doWork完成时。
+
+disableRecv啥子时候恢复的？
+]
+]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]readPayload -> readConnectRequest]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]
+
+
+
+[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[ZookeeperServer.startup()[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[
+
+[
+LeaderZookeeperServer
+	LeaderSessionTracker
+LearnerZookeeperServer
+	LearnerSessionTracker
+]
+
+
+
+
+
+
+to:processors
+]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]ZookeeperServer.startup(]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]
+
 
