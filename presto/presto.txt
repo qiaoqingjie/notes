@@ -1,0 +1,83 @@
+[config:
+
+Config和LegacyConfig用于setter方法;DefunctConfig用于类。
+DefunctConfig是禁用的，配置文件中出现会报错；
+LegacyConfig是过时的但还可以用的，为了兼容以前的配置文件。
+
+
+Config和LegacyConfig同时出现：配置文件中用discovery.max-age-old或discovery.max-age都可以，如果都有，值不一样会报错。
+@Config("discovery.max-age")
+@LegacyConfig("discovery.max-age-old")
+
+LegacyConfig单独出现：需要指定replacedBy。
+@LegacyConfig(value={"stringOption-old1","stringOption-old2"},replacedBy= "stringOption")
+
+@DefunctConfig({"stringOption-old1","stringOption-old2"})
+]
+
+[
+eventClient是干啥子的？RequestLogHandler用了它。
+]
+
+[
+http-reqeust.log日志格式：
+return new HttpRequestEvent(
+                new DateTime(request.getTimeStamp()),
+                token,//仅仅是用来跟踪请求的，uuid
+                clientAddress,
+                protocol,
+                method,
+                requestUri,
+                user,
+                request.getHeader("User-Agent"),
+                request.getHeader("Referer"),
+                request.getContentRead(),
+                request.getHeader("Content-Type"),
+                response.getContentCount(),
+                response.getStatus(),
+                response.getHeader("Content-Type"),
+                timeToDispatch,//max(request.getDispatchTime()-request.getTimeStamp(),0)
+                timeToFirstByte,//max(request.getAttribute(TimingFilter.FIRST_BYTE_TIME)-request.getTimeStamp(),0)
+                timeToLastByte//max(currentTimeInMillis - request.getTimeStamp(), 0)
+        );
+
+]
+
+[discovery urls:
+
+ServiceResource:
+http://localhost:8081/v1/service
+http://localhost:8081/v1/service/discovery
+
+DynamicAnnouncementResource:
+http://localhost:8081/v1/announcement/presto-node-1
+
+StaticAnnouncementResource:
+http://localhost:8081/v1/announcement/static
+
+]
+
+[ServiceAnnouncement type:
+discovery
+
+
+
+]
+
+
+
+toooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
+[
+io.airlift.http.server。Inet4Networks
+]
+
+[DecayCounter
+The implementation is based on the ideas from
+ * http://www.research.att.com/people/Cormode_Graham/library/publications/CormodeShkapenyukSrivastavaXu09.pdf
+ * to not have to rely on a timer that decays the value periodically
+]
+
+[QuantileDigest
+
+]
+oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooot

@@ -1,0 +1,3 @@
+同步/异步/阻塞/非阻塞：
+http://blog.163.com/zhanjunxiong@126/blog/static/1166604982010828115737888/
+http://www.cppblog.com/converse/archive/2009/05/13/82879.html

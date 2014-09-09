@@ -1,0 +1,33 @@
+  validateConnection(curatorEvent);
+
+        listeners.forEach
+
+
+这两个的区别？
+
+getCuratorListenable：包含curator的各种事件（CREATE/delete/。。。）和WATCHED ；
+	（getCuratorListenable().addListener(T listener),是用zk event thread；
+	getCuratorListenable().addListener(T listener, Executor executor)可以指定线程池）
+getConnectionStateListenable：只包含WATCHED事件， 是curator的线程异步做；
+
+
+
+================================
+lost：
+1 当收到expired event,直接触发lost；
+或者
+2 当收到disconnection event，触发SUSPENDED，并且执行一个sync()，background，using retries，如果sync失败，则触发lost。
+
+
+参考：
+http://mail-archives.apache.org/mod_mbox/curator-user/201310.mbox/%3CCANykduYWO3Kc4TYLEn-MkeVuF5Jyoc4cu2Otf4Yv4U0x+pGfhQ@mail.gmail.com%3E
+
+
+
+
+
+
+
+
+
+

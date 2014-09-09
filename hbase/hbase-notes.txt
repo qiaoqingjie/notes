@@ -1,0 +1,88 @@
+[[[[[[[[[[[[[[[[[[[[
+protobuf rpc:
+
+service.proto
+生成=> 
+Service.Interface
+Service.BlockingInterface
+Service.Stub
+Service.BlockingStub
+
+Service.newReflectiveBlockingService(BlockingInterface impl)
+Service.newReflectiveService(Interface impl)
+Service.newStub(com.google.protobuf.RpcChannel channel)
+Service.newBlockingStub(com.google.protobuf.BlockingRpcChannel channel)
+
+
+rpc实现：（protobuf只提供序列化，需要自己实现网络传输，有第三方的开源实现）
+1 client:
+实现RpcChannel/BlockingRpcChannel：连接server，将service/方法/参数用protobuf序列化后，发给server；处理响应。
+然后Service.newStub(channel)，就可以直接调用Stub的各种接口方法。
+
+2 server:
+实现Interface/BlockingInterface的业务逻辑；
+Service.newReflectiveBlockingService(Interface impl)得到serviceImpl；
+监听server端口，获取client连接，读取请求，调用serviceImpl的callBlockingMethod方法，得到结果，写回client。
+
+
+
+]]]]]]]]]]]]]]]]]]]]]]]]]]]
+
+[[[[[[[[[[[[[[[[[[
+HRegionServer：
+	RSRpcServices-------------------------------
+		实现各种protobuf定义的service接口；
+		HRegionServer（实现service接口需要用此实例）;
+		RpcServer;
+
+		RpcServer:---------------------------------
+			1 listener thread: selector accept
+			10 Reader thread: selector read
+			1 Responder thread: selector write
+			SimpleRpcScheduler/FifoRpcScheduler
+
+			SimpleRpcScheduler:----------------------------
+				BalancedQueueRpcExecutor callExecutor
+				BalancedQueueRpcExecutor priorityExecutor
+				BalancedQueueRpcExecutor replicationExecutor
+
+				BalancedQueueRpcExecutor：---------------------------------------------------------------------------------------------------------------
+					List<BlockingQueue<CallRunner>> queues（BoundedPriorityBlockingQueue）
+					(将queue分配给所有的handler thread，一个handler只消费一个queue，一个queue可以被多个handler消费，线上配置是200个handler消费同一个queue)
+					QueueBalancer balancer
+]]]]]]]]]]]]]]]]]]]]]]]]]]
+
+HRegionServer：
+	RSRpcServices
+
+
+RSRpcServices:
+	实现各种protobuf定义的service接口；
+	HRegionServer（实现service接口需要用此实例）；
+	RpcServer；
+
+
+RpcServer: 
+	1 listener thread: selector accept
+	10 Reader thread: selector read
+	1 Responder thread: selector write
+
+	SimpleRpcScheduler/FifoRpcScheduler
+
+
+
+SimpleRpcScheduler：
+	BalancedQueueRpcExecutor callExecutor
+	BalancedQueueRpcExecutor priorityExecutor
+	BalancedQueueRpcExecutor replicationExecutor
+
+BalancedQueueRpcExecutor：
+	List<BlockingQueue<CallRunner>> queues（BoundedPriorityBlockingQueue）
+	QueueBalancer balancer
+	
+
+RpcScheduler
+
+RpcExecutor
+
+handler
